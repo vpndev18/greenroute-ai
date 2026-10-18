@@ -16,7 +16,7 @@ baseline (large model, Mumbai grid, run immediately) in a realtime Firestore led
 
 | Service | Role |
 |---|---|
-| **Gemini on Vertex AI** | Prompt triage (structured JSON output), answer generation across regions, multimodal image prompts, and a natural-language sustainability analyst |
+| **Gemini on Vertex AI** | Prompt triage (structured JSON output), answer generation across regions, and a natural-language sustainability analyst |
 | **Cloud Run** | FastAPI backend: router, carbon planner, Pub/Sub worker, analytics API |
 | **Firebase Hosting** | Web app; `/api/**` is rewritten to Cloud Run |
 | **Firestore** | Realtime routing ledger and global CO₂ counters; the dashboard updates live via `onSnapshot` |
@@ -24,7 +24,6 @@ baseline (large model, Mumbai grid, run immediately) in a realtime Firestore led
 | **BigQuery ML → Vertex AI Model Registry** | `outlen_model` (predicts output tokens before execution, for energy estimates) and `demand_model` (ARIMA_PLUS, 24 h demand forecast) |
 | **Pub/Sub** | Event-driven queue for deferred batch jobs; a push subscription triggers the Cloud Run worker |
 | **Cloud Storage** | Raw dataset landing zone |
-| **Gemini vision** | Image attachments are analysed and counted in the energy model |
 
 ## Data
 - Google Cloud region carbon data (2023): https://github.com/GoogleCloudPlatform/region-carbon-info
