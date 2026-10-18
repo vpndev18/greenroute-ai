@@ -1,0 +1,556 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0;font-family:system-ui,sans-serif}</style>
+<title>GreenRoute Request Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (~980px) with full-width figures; numbered stages match the circled numbers in the diagrams. */
+:root {
+  --bg: #f4f7f5; --surface: #ffffff; --fg: #13201a; --muted: #56675f; --line: #d3ddd8; --line-strong: #9fb1a8;
+  --accent: #17794f; --accent-soft: #e2f2ea; --amber: #a86400; --amber-soft: #fbefdc; --blue: #2d5fb4; --blue-soft: #e5ecf9;
+  --code-bg: #eef3f0;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1412; --surface: #151e1a; --fg: #e2ebe6; --muted: #93a49c; --line: #29352f; --line-strong: #4a5c54;
+  --accent: #4fc68f; --accent-soft: #173126; --amber: #f0a840; --amber-soft: #33270f; --blue: #7ea8f2; --blue-soft: #18233a;
+  --code-bg: #121a17; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e1412; --surface: #151e1a; --fg: #e2ebe6; --muted: #93a49c; --line: #29352f; --line-strong: #4a5c54;
+  --accent: #4fc68f; --accent-soft: #173126; --amber: #f0a840; --amber-soft: #33270f; --blue: #7ea8f2; --blue-soft: #18233a;
+  --code-bg: #121a17; color-scheme: dark; }
+
+body { background: var(--bg); color: var(--fg); font: 15.5px/1.6 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 72px; }
+.wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 17px; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font: 500 12px var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 18px; color: var(--muted); max-width: 64ch; }
+code, .mono { font-family: var(--f-mono); font-size: 0.88em; }
+:not(pre) > code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header { display: flex; flex-direction: column; gap: 14px; }
+.decisions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.decisions div { background: var(--surface); padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+.decisions b { font-family: var(--f-display); font-size: 16px; }
+.decisions span { color: var(--muted); font-size: 14px; }
+.decisions code { font-size: 12.5px; }
+
+figure { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; }
+.fig svg { display: block; width: 100%; min-width: 860px; height: auto; color: var(--fg); }
+figcaption { color: var(--muted); font-size: 14px; max-width: 80ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { display: inline-block; width: 28px; height: 0; border-top: 2px solid; }
+.lg-sync { border-color: var(--accent) !important; }
+.lg-async { border-color: var(--amber) !important; border-top-style: dashed !important; }
+.lg-data { border-color: var(--blue) !important; }
+.lg-ret { border-color: var(--muted) !important; border-top-style: dashed !important; }
+
+/* SVG styling */
+svg text { font-family: var(--f-body); fill: var(--fg); font-size: 13px; }
+svg .t { font-weight: 600; font-size: 13.5px; }
+svg .s { fill: var(--muted); font-size: 11.5px; }
+svg .m { font-family: var(--f-mono); font-size: 11.5px; }
+svg .lab { font-size: 11.5px; fill: var(--fg); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+svg .zl { font: 500 11px var(--f-mono); letter-spacing: 0.06em; fill: var(--muted); text-transform: uppercase; }
+svg .node { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.2; }
+svg .inner { fill: var(--bg); stroke: var(--line-strong); stroke-width: 1; }
+svg .container { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
+svg .zone { fill: none; stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 5 4; }
+svg .e { fill: none; stroke-width: 1.8; }
+svg .sync { stroke: var(--accent); }
+svg .async { stroke: var(--amber); stroke-dasharray: 6 4; }
+svg .data { stroke: var(--blue); }
+svg .ret { stroke: var(--muted); stroke-dasharray: 4 4; stroke-width: 1.4; }
+svg .mk-sync { fill: var(--accent); }
+svg .mk-async { fill: var(--amber); }
+svg .mk-data { fill: var(--blue); }
+svg .mk-ret { fill: var(--muted); }
+svg .life { stroke: var(--line-strong); stroke-dasharray: 3 5; stroke-width: 1; }
+svg .note { fill: var(--amber-soft); stroke: var(--amber); stroke-width: 1; }
+svg .frame { fill: none; stroke: var(--line-strong); stroke-width: 1.2; }
+svg .ftag { fill: var(--bg); stroke: var(--line-strong); stroke-width: 1.2; }
+
+/* Tables */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 720px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font: 500 11.5px var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--f-display); font-weight: 800; color: var(--accent); width: 28px; }
+td.n.a { color: var(--amber); }
+td.n.d { color: var(--blue); }
+td .svc { display: inline-block; font: 500 11.5px var(--f-mono); padding: 1px 7px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+
+pre { margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font: 13px/1.6 var(--f-mono); color: var(--fg); }
+pre .c { color: var(--muted); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.two > div { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.calc { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.calc div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.calc small { color: var(--muted); font-size: 12.5px; }
+.calc b { font: 600 20px var(--f-mono); font-variant-numeric: tabular-nums; }
+.calc .good b { color: var(--accent); }
+ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; max-width: 76ch; }
+.callout { border-left: 3px solid var(--amber); background: var(--amber-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: 14.5px; }
+
+@media (max-width: 720px) {
+  .decisions, .two, .calc { grid-template-columns: 1fr; }
+  body { padding-block: 24px 48px; }
+}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">GreenRoute AI · technical walkthrough</div>
+  <h1>How a prompt moves through GreenRoute</h1>
+  <p class="lede">GreenRoute is a carbon-aware router for LLM requests. A FastAPI service on Cloud Run makes three decisions for every prompt, runs it on Gemini, and writes a carbon ledger to Firestore. The browser reads that ledger live.</p>
+  <div class="decisions">
+    <div><b>Which model</b><span>Gemini Flash-Lite classifies the prompt as simple, medium or complex. That maps to the Lite, Flash or Pro tier.</span><code>classify()</code></div>
+    <div><b>Where</b><span>Pick the region whose grid has the lowest gCO₂/kWh. In India-only mode, only Mumbai and Delhi are allowed.</span><code>plan_slot()</code></div>
+    <div><b>When</b><span>Deferrable jobs search 30-minute slots up to the deadline and go through Pub/Sub.</span><code>plan_slot() + /api/worker</code></div>
+  </div>
+</header>
+
+<!-- ============ FIG 1: ARCHITECTURE ============ -->
+<section>
+  <h2>Architecture</h2>
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1180 620" role="img" aria-label="Architecture: the browser calls Firebase Hosting, which rewrites /api to Cloud Run. Cloud Run calls Gemini for triage and for the answer, writes to Firestore, publishes deferred jobs to Pub/Sub which pushes them back to /api/worker, and reads BigQuery at startup. The browser listens to Firestore for live updates.">
+        <defs>
+          <marker id="a-sync" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-sync" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="a-async" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-async" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="a-data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-data" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- zones -->
+        <rect class="zone" x="275" y="196" width="200" height="410" rx="10"/>
+        <text class="zl" x="290" y="214">Firebase</text>
+        <rect class="zone" x="915" y="14" width="258" height="322" rx="10"/>
+        <text class="zl" x="930" y="32">Vertex AI · Gemini</text>
+
+        <!-- Browser -->
+        <rect class="node" x="20" y="230" width="160" height="90" rx="8"/>
+        <text class="t" x="100" y="260" text-anchor="middle">Browser</text>
+        <text class="s" x="100" y="280" text-anchor="middle">index.html + app.js</text>
+        <text class="s" x="100" y="298" text-anchor="middle">Firebase JS SDK</text>
+
+        <!-- Hosting -->
+        <rect class="node" x="290" y="230" width="170" height="90" rx="8"/>
+        <text class="t" x="375" y="260" text-anchor="middle">Firebase Hosting</text>
+        <text class="s" x="375" y="280" text-anchor="middle">serves public/</text>
+        <text class="s m" x="375" y="298" text-anchor="middle">/api/** → Cloud Run</text>
+
+        <!-- Firestore -->
+        <rect class="node" x="290" y="500" width="170" height="90" rx="8"/>
+        <text class="t" x="375" y="530" text-anchor="middle">Firestore</text>
+        <text class="s m" x="375" y="550" text-anchor="middle">requests/{id}</text>
+        <text class="s m" x="375" y="568" text-anchor="middle">stats/global</text>
+
+        <!-- Cloud Run container -->
+        <rect class="container" x="560" y="110" width="280" height="350" rx="10"/>
+        <text class="t" x="575" y="134">Cloud Run · greenroute</text>
+        <text class="s" x="575" y="151">FastAPI · asia-south1 · min 1 instance</text>
+        <rect class="inner" x="575" y="160" width="250" height="50" rx="6"/>
+        <text class="t m" x="700" y="181" text-anchor="middle">POST /api/route</text>
+        <text class="s" x="700" y="199" text-anchor="middle">classify · predict · plan_slot</text>
+        <rect class="inner" x="575" y="260" width="250" height="50" rx="6"/>
+        <text class="t m" x="700" y="281" text-anchor="middle">execute(job)</text>
+        <text class="s" x="700" y="299" text-anchor="middle">generate · energy · CO₂ · write</text>
+        <rect class="inner" x="575" y="360" width="250" height="50" rx="6"/>
+        <text class="t m" x="700" y="381" text-anchor="middle">POST /api/worker</text>
+        <text class="s" x="700" y="399" text-anchor="middle">Pub/Sub push handler</text>
+
+        <!-- Gemini triage -->
+        <rect class="node" x="930" y="40" width="230" height="70" rx="8"/>
+        <text class="t" x="1045" y="68" text-anchor="middle">Gemini Flash-Lite</text>
+        <text class="s" x="1045" y="88" text-anchor="middle">triage · us-central1 · JSON schema</text>
+
+        <!-- Gemini serving -->
+        <rect class="node" x="930" y="250" width="230" height="70" rx="8"/>
+        <text class="t" x="1045" y="278" text-anchor="middle">Gemini Lite / Flash / Pro</text>
+        <text class="s" x="1045" y="298" text-anchor="middle">greenest region that has the model</text>
+
+        <!-- Pub/Sub -->
+        <rect class="node" x="580" y="520" width="240" height="72" rx="8"/>
+        <text class="t" x="700" y="546" text-anchor="middle">Pub/Sub</text>
+        <text class="s m" x="700" y="565" text-anchor="middle">topic greenroute-jobs</text>
+        <text class="s m" x="700" y="582" text-anchor="middle">push sub greenroute-worker</text>
+
+        <!-- BigQuery -->
+        <rect class="node" x="930" y="500" width="230" height="90" rx="8"/>
+        <text class="t" x="1045" y="528" text-anchor="middle">BigQuery + BigQuery ML</text>
+        <text class="s m" x="1045" y="548" text-anchor="middle">region_carbon · ML.WEIGHTS</text>
+        <text class="s m" x="1045" y="566" text-anchor="middle">fleet_* · demand_forecast</text>
+
+        <!-- ① browser -> hosting -->
+        <path class="e sync" d="M180,275 H290" marker-end="url(#a-sync)"/>
+        <text class="lab" x="235" y="266" text-anchor="middle">① POST /api/route</text>
+        <!-- ② hosting -> route -->
+        <path class="e sync" d="M460,275 H520 V185 H575" marker-end="url(#a-sync)"/>
+        <text class="lab" x="466" y="294">② rewrite</text>
+        <!-- ③ route -> triage -->
+        <path class="e sync" d="M825,180 H875 V75 H930" marker-end="url(#a-sync)"/>
+        <text class="lab" x="884" y="134">③ classify()</text>
+        <!-- internal: route -> execute -->
+        <path class="e sync" d="M700,210 V260" marker-end="url(#a-sync)"/>
+        <text class="lab" x="710" y="240">non-deferrable</text>
+        <!-- internal: worker -> execute -->
+        <path class="e async" d="M700,360 V310" marker-end="url(#a-async)"/>
+        <text class="lab" x="710" y="340">deferred</text>
+        <!-- ⑤ execute -> serving -->
+        <path class="e sync" d="M825,285 H930" marker-end="url(#a-sync)"/>
+        <text class="lab" x="877" y="276" text-anchor="middle">⑤ generate</text>
+        <!-- ④ ⑦ cloud run -> firestore -->
+        <path class="e data" d="M560,430 H375 V500" marker-end="url(#a-data)"/>
+        <text class="lab" x="468" y="448" text-anchor="middle">④ plan · ⑦ result + stats</text>
+        <!-- ⑧ firestore -> browser -->
+        <path class="e data" d="M290,545 H100 V320" marker-end="url(#a-data)"/>
+        <text class="lab" x="195" y="537" text-anchor="middle">⑧ onSnapshot (live)</text>
+        <!-- ⑤b publish -->
+        <path class="e async" d="M640,460 V520" marker-end="url(#a-async)"/>
+        <text class="lab" x="632" y="495" text-anchor="end">⑤b publish</text>
+        <!-- ⑥ push -->
+        <path class="e async" d="M760,520 V410" marker-end="url(#a-async)"/>
+        <text class="lab" x="768" y="495">⑥ push → /api/worker</text>
+        <!-- ⑨ bigquery -> cloud run -->
+        <path class="e data" d="M930,545 H880 V400 H840" marker-end="url(#a-data)"/>
+        <text class="lab" x="888" y="455">⑨ reads at startup + for charts</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i class="lg-sync"></i>request path (synchronous)</span>
+      <span><i class="lg-async"></i>deferred path (Pub/Sub)</span>
+      <span><i class="lg-data"></i>data read / write</span>
+    </div>
+    <figcaption>Firebase Hosting serves the page and forwards every <code>/api/**</code> call to Cloud Run, so the site and the API share one origin. All writes go through Cloud Run using the Admin SDK. The browser only <em>reads</em> Firestore, and the security rules block client writes. Cloud Run also serves <code>/api/ask</code>, <code>/api/fleet</code>, <code>/api/forecast</code> and <code>/api/regions</code> for the dashboard panels.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ FIG 2: SEQUENCE ============ -->
+<section>
+  <h2>One request, in order</h2>
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1180 800" role="img" aria-label="Sequence: browser posts to /api/route via Hosting. Cloud Run classifies with Gemini Flash-Lite, plans tier, region and slot, and writes the plan to Firestore. If not deferrable it runs Gemini, computes carbon, writes the result and returns it. If deferrable it publishes to Pub/Sub and returns scheduled; Pub/Sub pushes to /api/worker which runs the same execute step. The browser receives updates through Firestore onSnapshot.">
+        <defs>
+          <marker id="s-sync" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-sync" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="s-async" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-async" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="s-data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-data" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="s-ret" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-ret" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- lifeline heads -->
+        <rect class="node" x="15" y="14" width="130" height="40" rx="6"/><text class="t" x="80" y="39" text-anchor="middle">Browser</text>
+        <rect class="node" x="165" y="14" width="130" height="40" rx="6"/><text class="t" x="230" y="39" text-anchor="middle">Hosting</text>
+        <rect class="container" x="335" y="14" width="130" height="40" rx="6"/><text class="t" x="400" y="39" text-anchor="middle">Cloud Run</text>
+        <rect class="node" x="505" y="14" width="150" height="40" rx="6"/><text class="t" x="580" y="39" text-anchor="middle">Gemini (triage)</text>
+        <rect class="node" x="675" y="14" width="130" height="40" rx="6"/><text class="t" x="740" y="39" text-anchor="middle">Firestore</text>
+        <rect class="node" x="825" y="14" width="150" height="40" rx="6"/><text class="t" x="900" y="39" text-anchor="middle">Gemini (answer)</text>
+        <rect class="node" x="1015" y="14" width="130" height="40" rx="6"/><text class="t" x="1080" y="39" text-anchor="middle">Pub/Sub</text>
+
+        <!-- lifelines -->
+        <line class="life" x1="80" y1="54" x2="80" y2="780"/>
+        <line class="life" x1="230" y1="54" x2="230" y2="780"/>
+        <line class="life" x1="400" y1="54" x2="400" y2="780"/>
+        <line class="life" x1="580" y1="54" x2="580" y2="780"/>
+        <line class="life" x1="740" y1="54" x2="740" y2="780"/>
+        <line class="life" x1="900" y1="54" x2="900" y2="780"/>
+        <line class="life" x1="1080" y1="54" x2="1080" y2="780"/>
+
+        <!-- 1 -->
+        <path class="e sync" d="M80,96 H230" marker-end="url(#s-sync)"/>
+        <text class="lab" x="155" y="89" text-anchor="middle">POST /api/route</text>
+        <!-- 2 -->
+        <path class="e sync" d="M230,130 H400" marker-end="url(#s-sync)"/>
+        <text class="lab" x="315" y="123" text-anchor="middle">rewrite /api/**</text>
+        <!-- 3 -->
+        <path class="e sync" d="M400,164 H580" marker-end="url(#s-sync)"/>
+        <text class="lab" x="490" y="157" text-anchor="middle">classify(prompt)</text>
+        <!-- 4 -->
+        <path class="e ret" d="M580,198 H400" marker-end="url(#s-ret)"/>
+        <text class="lab" x="490" y="191" text-anchor="middle">{complexity, reason}</text>
+        <!-- 5 note -->
+        <rect class="note" x="300" y="212" width="200" height="44" rx="5"/>
+        <text class="s" x="400" y="230" text-anchor="middle" style="fill:var(--fg)">tier · predict_out_tokens()</text>
+        <text class="s" x="400" y="247" text-anchor="middle" style="fill:var(--fg)">plan_slot(region, time)</text>
+        <!-- 6 -->
+        <path class="e data" d="M400,280 H740" marker-end="url(#s-data)"/>
+        <text class="lab" x="570" y="273" text-anchor="middle">set requests/{id} · status running | scheduled</text>
+
+        <!-- alt frame -->
+        <rect class="frame" x="20" y="298" width="1140" height="402" rx="4"/>
+        <path class="ftag" d="M20,298 H200 V316 L190,326 H20 Z"/>
+        <text class="m" x="30" y="317" style="font-weight:500">alt  deferrable = false</text>
+
+        <!-- 7 -->
+        <path class="e sync" d="M400,344 H900" marker-end="url(#s-sync)"/>
+        <text class="lab" x="650" y="337" text-anchor="middle">generate_content() · regions sorted by gCO₂/kWh</text>
+        <!-- 8 -->
+        <path class="e ret" d="M900,378 H400" marker-end="url(#s-ret)"/>
+        <text class="lab" x="650" y="371" text-anchor="middle">text + usage_metadata (token counts)</text>
+        <!-- 9 note -->
+        <rect class="note" x="300" y="390" width="200" height="30" rx="5"/>
+        <text class="s" x="400" y="410" text-anchor="middle" style="fill:var(--fg)">energy_wh · co2_g · baseline</text>
+        <!-- 10 -->
+        <path class="e data" d="M400,446 H740" marker-end="url(#s-data)"/>
+        <text class="lab" x="570" y="439" text-anchor="middle">merge result · Increment stats/global</text>
+        <!-- 11 -->
+        <path class="e ret" d="M400,480 H80" marker-end="url(#s-ret)"/>
+        <text class="lab" x="240" y="473" text-anchor="middle">200 {plan, result}</text>
+
+        <!-- else -->
+        <line class="frame" x1="20" y1="500" x2="1160" y2="500" style="stroke-dasharray:6 4"/>
+        <text class="m" x="30" y="518" style="font-weight:500">else  deferrable = true</text>
+        <!-- 12 -->
+        <path class="e async" d="M400,546 H1080" marker-end="url(#s-async)"/>
+        <text class="lab" x="740" y="539" text-anchor="middle">publish(job JSON, attr job_id)</text>
+        <!-- 13 -->
+        <path class="e ret" d="M400,580 H80" marker-end="url(#s-ret)"/>
+        <text class="lab" x="240" y="573" text-anchor="middle">200 {status: scheduled}</text>
+        <!-- 14 -->
+        <path class="e async" d="M1080,614 H400" marker-end="url(#s-async)"/>
+        <text class="lab" x="740" y="607" text-anchor="middle">push POST /api/worker · base64 message</text>
+        <!-- 15 note -->
+        <rect class="note" x="300" y="628" width="200" height="30" rx="5"/>
+        <text class="s" x="400" y="648" text-anchor="middle" style="fill:var(--fg)">execute(job) = steps 7 to 10</text>
+        <!-- 16 -->
+        <path class="e ret" d="M400,682 H1080" marker-end="url(#s-ret)"/>
+        <text class="lab" x="740" y="675" text-anchor="middle">204 (ack, even on failure)</text>
+
+        <!-- 17 -->
+        <path class="e data" d="M740,744 H80" marker-end="url(#s-data)"/>
+        <text class="lab" x="410" y="737" text-anchor="middle">onSnapshot · stats/global, latest 12 requests, requests/{id}</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i class="lg-sync"></i>synchronous call</span>
+      <span><i class="lg-async"></i>Pub/Sub</span>
+      <span><i class="lg-data"></i>Firestore read / write</span>
+      <span><i class="lg-ret"></i>response</span>
+    </div>
+    <figcaption>Both branches end in the same <code>execute()</code> function. A deferred request returns right away with <code>scheduled</code>. The browser then waits on <code>onSnapshot(requests/{id})</code> until the worker sets <code>status: "done"</code>.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ STAGE TABLE ============ -->
+<section>
+  <h2>What each stage does</h2>
+  <div class="tbl">
+    <table>
+      <thead><tr><th></th><th>Stage</th><th>What runs</th><th>Input → output</th><th>Service</th></tr></thead>
+      <tbody>
+        <tr><td class="n">①</td><td><b>Submit</b></td><td><code>app.js</code> "Go" handler. An attached image is read and base64-encoded in the browser.</td><td><code>{prompt, deferrable, deadline_hours, residency, image_b64?, image_mime?}</code></td><td><span class="svc">Firebase Hosting</span></td></tr>
+        <tr><td class="n">②</td><td><b>Route to backend</b></td><td><code>firebase.json</code> rewrite <code>/api/**</code> → Cloud Run service <code>greenroute</code></td><td>Same-origin HTTPS call, so no CORS is needed</td><td><span class="svc">Hosting → Cloud Run</span></td></tr>
+        <tr><td class="n">③</td><td><b>Triage</b></td><td><code>classify()</code> calls Gemini Flash-Lite in <code>us-central1</code> at temperature 0, with <code>response_schema</code> enforcing JSON</td><td>prompt → <code>{complexity, est_output_tokens, reason}</code>. Then simple→lite, medium→flash, complex→pro</td><td><span class="svc">Vertex AI</span></td></tr>
+        <tr><td class="n">④</td><td><b>Estimate + plan</b></td><td><code>predict_out_tokens()</code> uses BQML weights already in memory. <code>plan_slot()</code> scans each allowed region × each 30-min slot up to the deadline (or only "now")</td><td>input tokens ≈ <code>len(prompt)/4</code> (+258 for an image) → predicted output tokens, est. Wh, best <code>(region, slot, gCO₂/kWh)</code>. Written to <code>requests/{id}</code></td><td><span class="svc">Cloud Run → Firestore</span></td></tr>
+        <tr><td class="n">⑤</td><td><b>Execute</b></td><td><code>execute()</code> → <code>generate()</code> tries regions in ascending carbon order, then <code>global</code>. Up to 10 attempts. Caches working (tier, region) pairs and skips models that returned 404</td><td>prompt (+ image Part) → answer text + <code>usage_metadata</code> (prompt, candidates and thoughts tokens)</td><td><span class="svc">Vertex AI</span></td></tr>
+        <tr><td class="n a">⑤b</td><td><b>Defer</b></td><td>If <code>deferrable</code>, the job JSON is published instead of executed</td><td>job → topic <code>greenroute-jobs</code>. HTTP response is <code>scheduled</code></td><td><span class="svc">Pub/Sub</span></td></tr>
+        <tr><td class="n a">⑥</td><td><b>Worker</b></td><td>Push subscription <code>greenroute-worker</code> POSTs to <code>/api/worker</code>, which decodes base64 and calls <code>execute()</code></td><td>Returns 204 every time, so failures don't cause redelivery storms. Failures are recorded as <code>status: failed</code></td><td><span class="svc">Pub/Sub → Cloud Run</span></td></tr>
+        <tr><td class="n d">⑦</td><td><b>Account + persist</b></td><td>Real tokens → Wh → gCO₂ at the region and slot, compared with a Pro baseline in <code>asia-south1</code> right now</td><td><code>requests/{id}</code> merged with the result. <code>stats/global</code> updated with atomic <code>Increment</code>s</td><td><span class="svc">Firestore</span></td></tr>
+        <tr><td class="n d">⑧</td><td><b>Live UI</b></td><td>Three <code>onSnapshot</code> listeners: KPI totals, the latest 12 requests, and the single deferred job</td><td>Firestore pushes changes over a websocket, so the page doesn't poll</td><td><span class="svc">Firestore</span></td></tr>
+        <tr><td class="n d">⑨</td><td><b>Reference data</b></td><td>At startup, a background thread loads <code>region_carbon</code> and <code>ML.WEIGHTS(outlen_model)</code>. <code>/api/fleet</code> and <code>/api/forecast</code> query BigQuery and cache for 1 h</td><td>The request path never waits on BigQuery</td><td><span class="svc">BigQuery</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ CARBON MATH ============ -->
+<section>
+  <h2>The carbon maths</h2>
+  <p>Every number on the receipt comes from these four functions in <code>backend/main.py</code>. The constants are per 1,000 <em>output</em> tokens, and input tokens cost one tenth as much.</p>
+  <pre><span class="c"># hourly grid intensity: annual average with a solar dip centred at 13:00 local time</span>
+intensity(region, t) = annual × (1 − amp × cos(2π (local_hour − 13) / 24)),  amp = 0.04 + 0.14 × (1 − cfe)
+
+<span class="c"># energy, including data-centre overhead (PUE 1.09)</span>
+energy_Wh = 1.09 × (in_tokens × c / 10 + out_tokens × c) / 1000,   c = 0.25 (lite) · 0.60 (flash) · 2.50 (pro)
+
+co2_g      = energy_Wh / 1000 × intensity
+baseline_g = energy_Wh(pro, same tokens) / 1000 × intensity(asia-south1, now)
+saved_%    = (baseline_g − co2_g) / baseline_g</pre>
+  <h3>Worked example: "Translate 'good morning' into French"</h3>
+  <p>About 25 input tokens and 20 output tokens. Triage says simple, so the Lite tier runs in Montréal (about 2 gCO₂/kWh).</p>
+  <div class="calc">
+    <div><small>GreenRoute: Lite in Montréal</small><b>0.0061 Wh</b><small>≈ 0.00001 g CO₂</small></div>
+    <div><small>Baseline: Pro in Mumbai (648 g/kWh)</small><b>0.0613 Wh</b><small>≈ 0.040 g CO₂</small></div>
+    <div class="good"><small>Saved</small><b>≈ 99.9%</b><small>10× from tier choice, about 300× from region choice</small></div>
+  </div>
+  <p class="s" style="color:var(--muted);font-size:14px">Mumbai's figure varies a little with time of day because of the solar-dip model. The tier ratio (2.5 ÷ 0.25) and the grid ratio multiply together, which is why both decisions matter.</p>
+</section>
+
+<!-- ============ STORED DATA ============ -->
+<section>
+  <h2>What gets stored</h2>
+  <div class="two">
+    <div>
+      <h3><code>requests/{id}</code>, one per prompt</h3>
+<pre><span class="c"># written at ④ (plan)</span>
+created_at, prompt_preview (90 chars),
+residency, deferrable, has_image,
+status: running | scheduled,
+complexity, triage_reason, triage_model,
+tier, planned_region, planned_intensity,
+slot, deferred_by_min,
+vertex_pred_out_tokens, est_energy_wh,
+est_co2_g, est_baseline_co2_g
+<span class="c"># merged at ⑦ (result)</span>
+status: done | failed, answer, model,
+served_location, accounted_region,
+intensity, in_tokens, out_tokens,
+energy_wh, co2_g, baseline_co2_g,
+saved_g, saved_pct, latency_s</pre>
+    </div>
+    <div>
+      <h3><code>stats/global</code>, running totals</h3>
+<pre><span class="c"># firestore.Increment, so concurrent writes are safe</span>
+requests        += 1
+co2_g           += co2_g
+baseline_co2_g  += baseline_g
+saved_g         += saved_g
+energy_wh       += energy_Wh
+deferred        += 1 if deferrable</pre>
+      <h3>Security rules</h3>
+<pre>match /requests/{id} { allow read: if true; allow write: if false; }
+match /stats/{id}    { allow read: if true; allow write: if false; }
+<span class="c"># the backend's Admin SDK bypasses rules</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FIG 3: DATA PLANE ============ -->
+<section>
+  <h2>The BigQuery side, built once by <code>setup_gcp.sh</code></h2>
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1180 420" role="img" aria-label="Data plane: two public CSVs are streamed to Cloud Storage and loaded into BigQuery tables region_carbon and trace_raw. trace_raw feeds the fleet replay tables, demand_10min, and the outlen_model regression. demand_10min trains the ARIMA_PLUS demand_model which produces demand_forecast. Cloud Run reads region_carbon and the outlen weights at startup, and /api/fleet and /api/forecast read the derived tables.">
+        <defs>
+          <marker id="d-data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-data" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <text class="zl" x="20" y="410">sources</text>
+        <text class="zl" x="250" y="410">landing</text>
+        <text class="zl" x="460" y="410">raw tables</text>
+        <text class="zl" x="690" y="410">derived tables + BQML</text>
+        <text class="zl" x="960" y="410">consumers</text>
+
+        <rect class="node" x="20" y="60" width="180" height="50" rx="6"/>
+        <text class="t" x="110" y="81" text-anchor="middle">region-carbon-info</text>
+        <text class="s" x="110" y="99" text-anchor="middle">Google · 2023.csv</text>
+        <rect class="node" x="20" y="220" width="180" height="50" rx="6"/>
+        <text class="t" x="110" y="241" text-anchor="middle">Azure LLM trace</text>
+        <text class="s" x="110" y="259" text-anchor="middle">1 week · 1.1 GB CSV</text>
+
+        <rect class="node" x="250" y="60" width="160" height="210" rx="8"/>
+        <text class="t" x="330" y="158" text-anchor="middle">Cloud Storage</text>
+        <text class="s m" x="330" y="177" text-anchor="middle">gs://…-greenroute</text>
+
+        <rect class="node" x="460" y="60" width="170" height="50" rx="6"/>
+        <text class="t m" x="545" y="81" text-anchor="middle">region_carbon</text>
+        <text class="s" x="545" y="99" text-anchor="middle">region · cfe · intensity</text>
+        <rect class="node" x="460" y="220" width="170" height="50" rx="6"/>
+        <text class="t m" x="545" y="241" text-anchor="middle">trace_raw</text>
+        <text class="s" x="545" y="259" text-anchor="middle">ts · ctx · generated tokens</text>
+
+        <rect class="node" x="690" y="60" width="200" height="55" rx="6"/>
+        <text class="t m" x="790" y="83" text-anchor="middle">outlen_model</text>
+        <text class="s" x="790" y="102" text-anchor="middle">LINEAR_REG · Model Registry</text>
+        <rect class="node" x="690" y="140" width="200" height="60" rx="6"/>
+        <text class="t m" x="790" y="164" text-anchor="middle">fleet_summary</text>
+        <text class="s m" x="790" y="184" text-anchor="middle">fleet_by_tier · fleet_by_hour</text>
+        <rect class="node" x="690" y="225" width="200" height="40" rx="6"/>
+        <text class="t m" x="790" y="250" text-anchor="middle">demand_10min</text>
+        <rect class="container" x="690" y="290" width="200" height="40" rx="6"/>
+        <text class="t m" x="790" y="315" text-anchor="middle">demand_model · ARIMA_PLUS</text>
+        <rect class="node" x="690" y="355" width="200" height="40" rx="6"/>
+        <text class="t m" x="790" y="380" text-anchor="middle">demand_forecast</text>
+
+        <rect class="container" x="960" y="55" width="200" height="65" rx="8"/>
+        <text class="t" x="1060" y="78" text-anchor="middle">Cloud Run startup</text>
+        <text class="s m" x="1060" y="96" text-anchor="middle">load_region_carbon()</text>
+        <text class="s m" x="1060" y="112" text-anchor="middle">load_outlen_model()</text>
+        <rect class="container" x="960" y="140" width="200" height="60" rx="8"/>
+        <text class="t m" x="1060" y="166" text-anchor="middle">GET /api/fleet</text>
+        <text class="s" x="1060" y="185" text-anchor="middle">doughnut + % saved</text>
+        <rect class="container" x="960" y="225" width="200" height="170" rx="8"/>
+        <text class="t m" x="1060" y="303" text-anchor="middle">GET /api/forecast</text>
+        <text class="s" x="1060" y="322" text-anchor="middle">48 h history + 24 h forecast</text>
+
+        <!-- edges -->
+        <path class="e data" d="M200,85 H250" marker-end="url(#d-data)"/>
+        <path class="e data" d="M200,245 H250" marker-end="url(#d-data)"/>
+        <text class="lab" x="225" y="140" text-anchor="middle">curl | gsutil</text>
+        <path class="e data" d="M410,85 H460" marker-end="url(#d-data)"/>
+        <path class="e data" d="M410,245 H460" marker-end="url(#d-data)"/>
+        <text class="lab" x="435" y="140" text-anchor="middle">bq load</text>
+        <!-- trace_raw trunk -->
+        <path class="e data" d="M630,245 H690" marker-end="url(#d-data)"/>
+        <path class="e data" d="M660,245 V87 H690" marker-end="url(#d-data)"/>
+        <path class="e data" d="M660,170 H690" marker-end="url(#d-data)"/>
+        <text class="lab" x="652" y="160" text-anchor="end">SQL + BQML</text>
+        <!-- demand chain -->
+        <path class="e data" d="M790,265 V290" marker-end="url(#d-data)"/>
+        <text class="lab" x="800" y="283">train</text>
+        <path class="e data" d="M790,330 V355" marker-end="url(#d-data)"/>
+        <text class="lab" x="800" y="348">ML.FORECAST</text>
+        <!-- region_carbon -> startup over the top -->
+        <path class="e data" d="M630,72 H645 V32 H1060 V55" marker-end="url(#d-data)"/>
+        <text class="lab" x="850" y="26" text-anchor="middle">intensity per region</text>
+        <!-- consumers -->
+        <path class="e data" d="M890,87 H960" marker-end="url(#d-data)"/>
+        <text class="lab" x="925" y="79" text-anchor="middle">ML.WEIGHTS</text>
+        <path class="e data" d="M890,170 H960" marker-end="url(#d-data)"/>
+        <path class="e data" d="M890,245 H960" marker-end="url(#d-data)"/>
+        <path class="e data" d="M890,375 H960" marker-end="url(#d-data)"/>
+      </svg>
+    </div>
+    <figcaption><code>analytics.sql</code> replays every request in the Azure trace through a size-based tier rule (≤1k in / ≤150 out → lite, ≤4k / ≤600 → flash, otherwise pro). It totals energy on the Finland grid against Pro on the Mumbai grid. <code>outlen_model</code> regresses <code>ln(1+output)</code> on <code>ln(1+input)</code> using a 5% sample. Cloud Run pulls its two coefficients and scores in-process, with no prediction endpoint.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ OBSERVE ============ -->
+<section>
+  <h2>Where to watch it in Google Cloud</h2>
+  <div class="tbl">
+    <table>
+      <thead><tr><th></th><th>Stage</th><th>Console page</th><th>What you'll see</th></tr></thead>
+      <tbody>
+        <tr><td class="n">①②</td><td>Website</td><td><a href="https://console.firebase.google.com/project/greenroute-ai-511911/hosting" target="_blank" rel="noopener">Firebase → Hosting</a></td><td>Release history, the <code>web.app</code> domain</td></tr>
+        <tr><td class="n">②–⑦</td><td>Backend</td><td><a href="https://console.cloud.google.com/run/detail/asia-south1/greenroute?project=greenroute-ai-511911" target="_blank" rel="noopener">Cloud Run → greenroute</a></td><td>Request count, latency, instances, env vars, revisions</td></tr>
+        <tr><td class="n">②–⑦</td><td>Logs</td><td><a href="https://console.cloud.google.com/logs/query;query=resource.labels.service_name%3D%22greenroute%22?project=greenroute-ai-511911" target="_blank" rel="noopener">Logs Explorer</a></td><td><code>POST /api/route 200</code>, <code>POST /api/worker 204</code>, and model-fallback messages</td></tr>
+        <tr><td class="n">③⑤</td><td>Gemini</td><td><a href="https://console.cloud.google.com/apis/api/aiplatform.googleapis.com/metrics?project=greenroute-ai-511911" target="_blank" rel="noopener">Agent Platform API → Metrics</a></td><td>About two calls per prompt (triage + answer), plus error codes. Lags 1–3 min</td></tr>
+        <tr><td class="n d">④⑦</td><td>Ledger</td><td><a href="https://console.cloud.google.com/firestore/databases/-default-/data/panel?project=greenroute-ai-511911" target="_blank" rel="noopener">Firestore → Data</a></td><td>Every field in the table above. This is the best screen for showing each decision</td></tr>
+        <tr><td class="n a">⑤b⑥</td><td>Deferred</td><td><a href="https://console.cloud.google.com/cloudpubsub/subscription/list?project=greenroute-ai-511911" target="_blank" rel="noopener">Pub/Sub → greenroute-worker</a></td><td>Push endpoint, delivered and acked counts, unacked backlog (should be 0)</td></tr>
+        <tr><td class="n d">⑨</td><td>Data + ML</td><td><a href="https://console.cloud.google.com/bigquery?project=greenroute-ai-511911" target="_blank" rel="noopener">BigQuery → greenroute</a></td><td>7 tables and 2 models. Model tabs show training and evaluation</td></tr>
+        <tr><td class="n d">⑨</td><td>Registry</td><td><a href="https://console.cloud.google.com/vertex-ai/models?project=greenroute-ai-511911" target="_blank" rel="noopener">Model Registry (us-central1)</a></td><td><code>greenroute_outlen</code> (the demand model is in BigQuery only)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ LIMITS ============ -->
+<section>
+  <h2>Prototype limits</h2>
+  <ul class="plain">
+    <li><b>Grid intensity is modelled.</b> It uses Google's 2023 annual figure per region with a synthetic solar curve. A production version would read Electricity Maps or WattTime.</li>
+    <li><b>Deferred jobs run when they arrive.</b> Pub/Sub delivers within seconds, and the carbon is calculated at the planned slot. Real delay needs Cloud Tasks with a <code>schedule_time</code>.</li>
+    <li><b>Fallback to <code>global</code> loses location.</b> When no region in the allowed list serves the tier, the call goes to the global endpoint and is counted against <code>us-central1</code>. India-only requests can end up there.</li>
+    <li><b>Energy per token is an assumption</b>, calibrated to Google's published median of about 0.24 Wh per Gemini text prompt.</li>
+    <li><b>The API is open.</b> CORS is <code>*</code>, Cloud Run allows unauthenticated calls, and there is no rate limit.</li>
+  </ul>
+</section>
+
+</div>

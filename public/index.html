@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#060c09">
+<title>GreenRoute AI</title>
+<meta name="description" content="Carbon-aware router for LLM inference: right model, greenest region, greenest hour.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+:root{
+  --bg:#060c09;--card:rgba(255,255,255,.035);--card-solid:#0d1814;
+  --ink:#e8f2ec;--muted:#8fa399;--faint:#5d7268;--line:rgba(255,255,255,.08);--line-hi:rgba(255,255,255,.14);
+  --green:#34d27b;--green-strong:#6ee7a6;--green-soft:rgba(52,210,123,.12);--glow:rgba(52,210,123,.35);
+  --lime:#a3e635;--amber:#fbbf24;--amber-soft:rgba(251,191,36,.12);--red:#f87171;--red-soft:rgba(248,113,113,.12);
+  --radius:20px;--display:"Space Grotesk",Inter,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;background:var(--bg)}
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);line-height:1.5;background:var(--bg);min-height:100vh;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:radial-gradient(1000px 600px at 80% -10%,rgba(52,210,123,.16),transparent 60%),
+             radial-gradient(800px 500px at -10% 30%,rgba(163,230,53,.07),transparent 60%),
+             radial-gradient(900px 600px at 50% 120%,rgba(52,210,123,.08),transparent 60%)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:48px 48px;-webkit-mask-image:radial-gradient(ellipse at 50% 0%,#000 30%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 0%,#000 30%,transparent 75%)}
+.wrap{max-width:1200px;margin:0 auto;padding:0 16px}
+a{color:var(--green-strong)}
+::selection{background:rgba(52,210,123,.35)}
+
+/* ---------- nav + hero ---------- */
+.nav{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:22px 0}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:19px;white-space:nowrap}
+.brand .logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,rgba(52,210,123,.25),rgba(52,210,123,.05));border:1px solid rgba(52,210,123,.35);box-shadow:0 0 24px -6px var(--glow)}
+.brand span{color:var(--green-strong)}
+.live{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:99px;background:var(--card);border:1px solid var(--line-hi);color:var(--muted)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(52,210,123,.7);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(52,210,123,0)}100%{box-shadow:0 0 0 0 rgba(52,210,123,0)}}
+.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:24px;align-items:center;padding:28px 0 36px}
+@media(max-width:920px){.hero{grid-template-columns:1fr}.globe-box{max-width:340px;margin:0 auto}}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--green-strong);padding:6px 12px;border-radius:99px;background:var(--green-soft);border:1px solid rgba(52,210,123,.25)}
+.hero h1{font-family:var(--display);margin:18px 0 16px;font-size:clamp(36px,6vw,64px);line-height:1.02;letter-spacing:-.035em;font-weight:700}
+.hero h1 .g{background:linear-gradient(92deg,#6ee7a6 10%,#d9f99d 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero h1 .dim{color:var(--muted)}
+.lead{margin:0;max-width:560px;font-size:17px;color:var(--muted)}
+.decisions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:26px;max-width:620px}
+@media(max-width:560px){.decisions{grid-template-columns:1fr}}
+.decision{padding:12px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);transition:border-color .2s,transform .2s}
+.decision:hover{border-color:rgba(52,210,123,.35);transform:translateY(-2px)}
+.decision b{display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:14px;letter-spacing:.06em;color:var(--ink)}
+.decision small{display:block;margin-top:4px;font-size:12.5px;color:var(--muted)}
+.globe-box{position:relative;aspect-ratio:1/1;width:100%}
+.globe-box svg{width:100%;height:100%;overflow:visible}
+.route{stroke-dasharray:6 8;animation:dash 1.2s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-28}}
+.ping{transform-origin:center;transform-box:fill-box;animation:ping 2.4s ease-out infinite}
+@keyframes ping{0%{transform:scale(.6);opacity:.9}100%{transform:scale(2.6);opacity:0}}
+.float{animation:float 6s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-6px)}}
+
+/* ---------- layout + cards ---------- */
+main{display:grid;gap:16px;grid-template-columns:repeat(12,minmax(0,1fr));padding-bottom:40px}
+.card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px;min-width:0;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 20px 40px -24px rgba(0,0,0,.8);transition:border-color .25s}
+.card:hover{border-color:var(--line-hi)}
+.card.feature{border-color:rgba(52,210,123,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 0 0 1px rgba(52,210,123,.05),0 30px 60px -30px rgba(52,210,123,.25)}
+.c12{grid-column:span 12}.c7{grid-column:span 7}.c5{grid-column:span 5}.c6{grid-column:span 6}
+@media(max-width:920px){.c7,.c5,.c6{grid-column:span 12}}
+.card-h{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:16px}
+.card-h h2{font-family:var(--display);font-size:18px;margin:0;letter-spacing:-.01em;font-weight:600}
+.card-h .sub{font-size:13px;color:var(--muted);margin-top:3px}
+.pill{flex:none;font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--green-soft);color:var(--green-strong);border:1px solid rgba(52,210,123,.2);white-space:nowrap}
+.muted{color:var(--muted);font-size:13px}
+
+/* ---------- KPIs ---------- */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+@media(max-width:920px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);min-width:0}
+.kpi::after{content:"";position:absolute;right:-40px;top:-40px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,var(--kc,rgba(52,210,123,.22)),transparent 70%);pointer-events:none}
+.kpi:nth-child(3){--kc:rgba(251,191,36,.18)}
+.kpi .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--green-soft);color:var(--green-strong);margin-bottom:12px}
+.kpi:nth-child(3) .ic{background:var(--amber-soft);color:var(--amber)}
+.kpi small{display:block;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi b{display:block;font-family:var(--display);font-size:30px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15;white-space:nowrap}
+
+/* ---------- router ---------- */
+textarea,input[type=text],input[type=number],select{font:inherit;color:var(--ink);background:rgba(0,0,0,.3);border:1px solid var(--line-hi);border-radius:12px;padding:12px 14px;transition:border-color .15s,box-shadow .15s}
+select option{background:var(--card-solid)}
+textarea::placeholder,input::placeholder{color:var(--faint)}
+textarea:focus,input:focus,select:focus{outline:none;border-color:rgba(52,210,123,.6);box-shadow:0 0 0 4px rgba(52,210,123,.12)}
+textarea{width:100%;min-height:118px;resize:vertical;font-size:15px}
+.try{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.try>span{font-size:12.5px;color:var(--faint);margin-right:2px}
+.chip{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:99px;border:1px solid var(--line-hi);background:rgba(255,255,255,.03);color:var(--ink);cursor:pointer;display:inline-flex;gap:7px;align-items:center;transition:all .15s}
+.chip:hover{border-color:rgba(52,210,123,.5);background:var(--green-soft);color:var(--green-strong)}
+.chip i{width:7px;height:7px;border-radius:50%;display:inline-block;box-shadow:0 0 8px currentColor}
+.opts{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.opt{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02);font-size:13.5px;color:var(--muted)}
+.opt select,.opt input[type=number]{padding:4px 8px;border-radius:8px}
+.opt input[type=number]{width:58px}
+.switch{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:var(--ink);font-weight:500}
+.switch input{position:absolute;opacity:0;width:0;height:0}
+.switch .track{width:36px;height:20px;border-radius:99px;background:rgba(255,255,255,.12);position:relative;transition:background .2s}
+.switch .track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s}
+.switch input:checked+.track{background:var(--green);box-shadow:0 0 12px -2px var(--glow)}
+.switch input:checked+.track::after{transform:translateX(16px)}
+.switch input:focus-visible+.track{box-shadow:0 0 0 4px rgba(52,210,123,.25)}
+.file{cursor:pointer;color:var(--ink);font-weight:500;max-width:220px}
+.file input{position:absolute;opacity:0;width:0;height:0}
+.file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.go-row{display:flex;align-items:center;gap:14px;margin-top:18px;flex-wrap:wrap}
+.btn{font:inherit;font-weight:700;border:0;border-radius:12px;padding:12px 20px;color:#04140b;cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+  background:linear-gradient(180deg,#6ee7a6,#22c55e);box-shadow:0 0 0 1px rgba(110,231,166,.5),0 10px 30px -8px var(--glow);transition:transform .1s,box-shadow .2s,filter .2s}
+.btn:hover{filter:brightness(1.05);box-shadow:0 0 0 1px rgba(110,231,166,.7),0 12px 36px -6px rgba(52,210,123,.55)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.6;cursor:wait}
+.status{font-size:13.5px;color:var(--muted);display:inline-flex;align-items:center;gap:8px}
+.status.busy::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid var(--line-hi);border-top-color:var(--green);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- result ---------- */
+#result:empty{display:none}
+#result{margin-top:20px;border-top:1px dashed var(--line-hi);padding-top:20px;animation:rise .4s ease}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.receipt{display:flex;gap:20px;align-items:center;background:linear-gradient(135deg,rgba(52,210,123,.1),rgba(52,210,123,.02));border:1px solid rgba(52,210,123,.25);border-radius:16px;padding:18px}
+.ring{--p:0;flex:none;width:116px;height:116px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(var(--green) calc(var(--p)*1%),rgba(255,255,255,.08) 0);box-shadow:0 0 30px -8px var(--glow)}
+.ring>div{width:94px;height:94px;border-radius:50%;background:var(--card-solid);display:grid;place-items:center;text-align:center;line-height:1.1}
+.ring b{font-family:var(--display);font-size:22px;letter-spacing:-.02em;color:var(--green-strong)}
+.ring small{display:block;font-size:11px;color:var(--muted)}
+.receipt-body{flex:1;min-width:0}
+.receipt-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--green-strong);margin-bottom:6px}
+.kv{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line);color:var(--muted)}
+.kv:last-child{border-bottom:0}.kv b{color:var(--ink);font-variant-numeric:tabular-nums}
+.trace{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin:14px 0 8px}
+.trace div{background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12px;color:var(--muted)}
+.trace div b{display:block;font-size:14.5px;color:var(--ink);margin-top:3px;overflow-wrap:anywhere}
+.why{font-size:13px;color:var(--muted);margin:6px 0 0}
+.answer{margin-top:12px;font-size:14.5px;max-height:400px;overflow:auto;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:14px;padding:4px 18px}
+.answer code{font-family:"JetBrains Mono",monospace;font-size:12.5px;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:6px}
+.answer pre{background:rgba(255,255,255,.04);padding:12px;border-radius:10px;overflow:auto}
+
+/* ---------- charts / fleet / ledger ---------- */
+.chart{position:relative;height:280px}
+.fleet-top{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.big{font-family:var(--display);font-size:48px;font-weight:700;letter-spacing:-.04em;line-height:1;
+  background:linear-gradient(92deg,#6ee7a6,#d9f99d);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(52,210,123,.3))}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0}
+.stats div{background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stats small{display:block;font-size:11.5px;color:var(--muted)}
+.stats b{font-family:var(--display);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr{transition:background .15s}tbody tr:hover{background:rgba(255,255,255,.03)}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+.tag.done{background:var(--green-soft);color:var(--green-strong)}
+.tag.wait{background:var(--amber-soft);color:var(--amber)}
+.tag.fail{background:var(--red-soft);color:var(--red)}
+.tier{white-space:nowrap;font-size:12px;font-weight:600;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.ok{color:var(--green-strong);font-weight:700}
+.ledger{overflow:auto;max-height:420px}
+.ledger table{min-width:540px}
+
+/* ---------- analyst ---------- */
+.ask-row{display:flex;gap:8px}
+.ask-row input{flex:1;min-width:0}
+#askOut:empty{display:none}
+#askOut{margin-top:14px;font-size:14px;animation:rise .4s ease}
+
+footer{padding:12px 0 44px;color:var(--faint);font-size:12.5px;text-align:center}
+footer a{color:var(--muted)}
+
+@media(max-width:560px){
+  .wide{display:none}
+  .card{padding:16px}
+  .kpis{gap:10px}
+  .kpi{padding:14px}
+  .kpi .ic{display:none}
+  .kpi b{font-size:22px}
+  .receipt{flex-direction:column;align-items:stretch}
+  .ring{margin:0 auto}
+  .stats{grid-template-columns:1fr 1fr}
+  .big{font-size:40px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <div class="brand">
+      <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6ee7a6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg></div>
+      <div>Green<span>Route</span> AI</div>
+    </div>
+    <div class="live"><i></i>Live<span class="wide">on Google Cloud</span></div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <span class="eyebrow">Carbon-aware LLM routing</span>
+      <h1>Right model.<br><span class="g">Greenest region.</span><br><span class="dim">Greenest hour.</span></h1>
+      <p class="lead">Every prompt is right-sized, sent to the cleanest grid it’s allowed to use, and measured against the CO₂ it would have cost.</p>
+      <div class="decisions">
+        <div class="decision"><b><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6ee7a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>WHICH</b><small>Smallest model that answers well</small></div>
+        <div class="decision"><b><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6ee7a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>WHERE</b><small>Cleanest grid, residency respected</small></div>
+        <div class="decision"><b><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6ee7a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>WHEN</b><small>Batch jobs wait for green hours</small></div>
+      </div>
+    </div>
+
+    <div class="globe-box float" aria-hidden="true">
+      <svg viewBox="0 0 400 400">
+        <defs>
+          <radialGradient id="gl" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#1b4b35"/><stop offset=".6" stop-color="#0b2219"/><stop offset="1" stop-color="#060c09"/></radialGradient>
+          <radialGradient id="halo" r="50%"><stop offset=".62" stop-color="rgba(52,210,123,0)"/><stop offset=".72" stop-color="rgba(52,210,123,.22)"/><stop offset="1" stop-color="rgba(52,210,123,0)"/></radialGradient>
+          <linearGradient id="rt" x1="0" x2="1"><stop offset="0" stop-color="#f87171"/><stop offset="1" stop-color="#6ee7a6"/></linearGradient>
+          <clipPath id="clip"><circle cx="200" cy="200" r="150"/></clipPath>
+        </defs>
+        <circle cx="200" cy="200" r="198" fill="url(#halo)"/>
+        <circle cx="200" cy="200" r="150" fill="url(#gl)" stroke="rgba(110,231,166,.35)" stroke-width="1"/>
+        <g clip-path="url(#clip)" fill="none" stroke="rgba(110,231,166,.16)" stroke-width="1">
+          <ellipse cx="200" cy="200" rx="150" ry="150"><animate attributeName="rx" values="150;0;150" dur="12s" repeatCount="indefinite"/></ellipse>
+          <ellipse cx="200" cy="200" rx="110" ry="150"><animate attributeName="rx" values="110;150;0;110" dur="12s" repeatCount="indefinite"/></ellipse>
+          <ellipse cx="200" cy="200" rx="55" ry="150"><animate attributeName="rx" values="55;110;150;0;55" dur="12s" repeatCount="indefinite"/></ellipse>
+          <ellipse cx="200" cy="200" rx="150" ry="34"/>
+          <ellipse cx="200" cy="140" rx="138" ry="28"/>
+          <ellipse cx="200" cy="260" rx="138" ry="28"/>
+          <ellipse cx="200" cy="90" rx="105" ry="20"/>
+          <ellipse cx="200" cy="310" rx="105" ry="20"/>
+        </g>
+        <path d="M262 236 Q300 120 214 112" fill="none" stroke="url(#rt)" stroke-width="2.5" stroke-linecap="round" class="route"/>
+        <path d="M118 150 Q160 100 214 112" fill="none" stroke="rgba(110,231,166,.35)" stroke-width="1.5" stroke-linecap="round" class="route"/>
+        <circle cx="262" cy="236" r="6" fill="#f87171"/>
+        <circle cx="262" cy="236" r="6" fill="none" stroke="#f87171" stroke-width="2" class="ping"/>
+        <circle cx="214" cy="112" r="7" fill="#6ee7a6"/>
+        <circle cx="214" cy="112" r="7" fill="none" stroke="#6ee7a6" stroke-width="2" class="ping"/>
+        <circle cx="118" cy="150" r="5" fill="#6ee7a6" opacity=".8"/>
+        <circle cx="150" cy="208" r="4.5" fill="#fbbf24" opacity=".85"/>
+        <circle cx="300" cy="200" r="4" fill="#f87171" opacity=".7"/>
+        <g font-family="Inter,sans-serif" font-size="12" font-weight="600">
+          <rect x="268" y="244" width="104" height="26" rx="13" fill="rgba(248,113,113,.14)" stroke="rgba(248,113,113,.45)"/>
+          <text x="320" y="261" text-anchor="middle" fill="#fecaca">Mumbai · 648</text>
+          <rect x="222" y="70" width="104" height="26" rx="13" fill="rgba(52,210,123,.14)" stroke="rgba(110,231,166,.5)"/>
+          <text x="274" y="87" text-anchor="middle" fill="#bbf7d0">Finland · 46</text>
+          <text x="200" y="384" text-anchor="middle" fill="#8fa399" font-weight="500" font-size="11">gCO₂/kWh · Google Cloud 2023</text>
+        </g>
+      </svg>
+    </div>
+  </header>
+
+  <main>
+    <section class="c12 kpis" id="kpis" aria-label="Live totals">
+      <div class="kpi"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><small>Requests routed (live)</small><b id="k-req">–</b></div>
+      <div class="kpi"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg></div><small>CO₂ saved vs. baseline</small><b id="k-saved">–</b></div>
+      <div class="kpi"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 18l-9.5-9.5-5 5L1 6"/><path d="M17 18h6v-6"/></svg></div><small>Average reduction</small><b id="k-pct">–</b></div>
+      <div class="kpi"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><small>Energy used</small><b id="k-wh">–</b></div>
+    </section>
+
+    <section class="card c7 feature">
+      <div class="card-h"><div><h2>Try the router</h2><div class="sub">Gemini triages, plans and runs your prompt, then prints its carbon receipt.</div></div><span class="pill">Gemini · Vertex AI</span></div>
+      <textarea id="prompt" aria-label="Prompt" placeholder="Ask anything… e.g. “What is the capital of France?” or “Design a fault-tolerant payment ledger”"></textarea>
+      <div class="try">
+        <span>Try:</span>
+        <button class="chip" data-p="Translate 'good morning' into Hindi."><i style="background:var(--lime);color:var(--lime)"></i>Simple</button>
+        <button class="chip" data-p="Write a polite email to my manager asking for Friday off."><i style="background:var(--green);color:var(--green)"></i>Medium</button>
+        <button class="chip" data-p="Design a fault-tolerant, exactly-once payment ledger for UPI-scale traffic. Compare event sourcing vs. double-entry tables and explain failure modes."><i style="background:var(--red);color:var(--red)"></i>Complex</button>
+        <button class="chip" data-p="Summarise last quarter's sales report into 5 bullet points for an overnight batch job." data-defer="1"><i style="background:var(--amber);color:var(--amber)"></i>Batch job (deferrable)</button>
+      </div>
+      <div class="opts">
+        <label class="opt switch"><input type="checkbox" id="defer"><span class="track"></span>Deferrable batch</label>
+        <label class="opt">Deadline <input type="number" id="deadline" value="8" min="1" max="24"> h</label>
+        <label class="opt">Residency
+          <select id="residency"><option value="anywhere">Anywhere</option><option value="india">India only (DPDP)</option></select>
+        </label>
+        <label class="opt file"><input type="file" id="image" accept="image/*"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span id="imageName">Attach image</span></label>
+      </div>
+      <div class="go-row">
+        <button class="btn" id="go">Route &amp; run <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
+        <span class="status" id="status" role="status"></span>
+      </div>
+      <div id="result"></div>
+    </section>
+
+    <section class="card c5">
+      <div class="card-h"><div><h2>Grid carbon by region</h2><div class="sub">Right now. Lower is cleaner; hourly shape modelled.</div></div><span class="pill">gCO₂/kWh</span></div>
+      <div class="chart" style="height:360px"><canvas id="regionChart" aria-label="Grid carbon intensity by region"></canvas></div>
+    </section>
+
+    <section class="card c6">
+      <div class="card-h"><div><h2>Fleet replay</h2><div class="sub">1 week of real Azure LLM traffic, replayed in BigQuery.</div></div><span class="pill">BigQuery</span></div>
+      <div id="fleet" class="muted">Loading…</div>
+      <div class="chart" style="height:200px"><canvas id="tierChart" aria-label="Requests by model tier"></canvas></div>
+    </section>
+
+    <section class="card c6">
+      <div class="card-h"><div><h2>Demand forecast · 24 h</h2><div class="sub">ARIMA_PLUS on 10-minute buckets. Deferred jobs avoid the peaks.</div></div><span class="pill">BigQuery ML</span></div>
+      <div class="chart" style="height:345px"><canvas id="fcChart" aria-label="Request demand history and forecast"></canvas></div>
+    </section>
+
+    <section class="card c7">
+      <div class="card-h"><div><h2>Live routing ledger</h2><div class="sub">Every decision, streamed from Firestore as it happens.</div></div><span class="pill">Firestore realtime</span></div>
+      <div class="ledger"><table><thead><tr><th>Prompt</th><th>Tier</th><th>Region</th><th>Status</th><th>gCO₂</th><th>Saved</th></tr></thead><tbody id="feed"><tr><td colspan="6" class="muted">Waiting for requests…</td></tr></tbody></table></div>
+    </section>
+
+    <section class="card c5">
+      <div class="card-h"><div><h2>Sustainability analyst</h2><div class="sub">Answers only from live Firestore and BigQuery data.</div></div><span class="pill">Gemini</span></div>
+      <div class="ask-row"><input type="text" id="q" aria-label="Question" placeholder="Ask about the savings…"><button class="btn" id="ask">Ask</button></div>
+      <div class="try">
+        <button class="chip" data-q="How much CO2 did the fleet replay save, in car-km?">Fleet savings</button>
+        <button class="chip" data-q="Which region is greenest right now and why?">Greenest region</button>
+        <button class="chip" data-q="What if we must keep data in India?">India-only</button>
+      </div>
+      <div id="askOut" class="answer" aria-live="polite"></div>
+    </section>
+  </main>
+</div>
+<footer class="wrap">GreenRoute AI · Gemini on Vertex AI · Cloud Run · Firebase · Firestore · BigQuery ML · Pub/Sub<br>Energy figures are estimates calibrated to Google’s published 0.24 Wh median per Gemini prompt. Data: <a href="https://github.com/GoogleCloudPlatform/region-carbon-info">Google Cloud region carbon</a>, <a href="https://github.com/Azure/AzurePublicDataset">Azure LLM Inference Trace (CC-BY)</a>.</footer>
+<script src="/firebase-config.js"></script>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

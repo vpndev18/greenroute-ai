@@ -1,0 +1,8 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public read-only dashboard; only the backend (Admin SDK) writes.
+    match /requests/{id} { allow read: if true; allow write: if false; }
+    match /stats/{id}    { allow read: if true; allow write: if false; }
+  }
+}

@@ -1,0 +1,13 @@
+__pycache__/
+.firebase/
+*.log
+.env
+# local-only notes and editor/OS files
+greenhouse.docs
+GreenRoute_AI_Guide.pdf
+~$*
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+*.pyc
